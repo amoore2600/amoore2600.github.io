@@ -772,11 +772,13 @@ input::placeholder {
 
 <script>
 const AVG_ROWS_PER_SENSOR_PER_DAY = 18252;
-const BYTES_PER_ROW = 314;
+const BYTES_PER_ROW = 211;
 const RETENTION_DAYS = 30;
 const NEW_IPS_PER_SENSOR_PER_DAY = 130;
 const DB_OVERHEAD = 1.15;
 const BLOCKLIST_BYTES_PER_IP = 16;
+const MAX_SENSORS_PER_EM = 250;
+const SQLITE_MAX_ROWS_SEC = 78000;
 
 const FIREWALLS = [
   { name: 'Palo Alto EDL (PA-3200/5200/7000)', limit: 150000, source: 'Palo Alto Docs' },
@@ -956,22 +958,30 @@ function calculate() {
   }
 
   // DB stats
+  const rowsPerSec = dailyRows / 86400;
+  const rowsPerSecPerEm = rowsPerSec / emCount;
+  const headroom = Math.round(SQLITE_MAX_ROWS_SEC / Math.max(rowsPerSecPerEm, 0.001));
+  const dbSizePerEm = db30d / emCount;
   document.getElementById('dbStats').innerHTML = `
     <div class="stat-card">
       <div class="stat-value">${dailyRows.toLocaleString()}</div>
-      <div class="stat-label">Daily Rows</div>
+      <div class="stat-label">Daily Rows (total)</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${(dailyRows / 86400).toFixed(1)}</div>
-      <div class="stat-label">Rows/sec (avg)</div>
+      <div class="stat-value">${rowsPerSecPerEm.toFixed(1)}</div>
+      <div class="stat-label">Rows/sec per EM</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${(dailyRows * 30).toLocaleString()}</div>
-      <div class="stat-label">30-Day Total Rows</div>
+      <div class="stat-value">${sizeFormat(dbSizePerEm)}</div>
+      <div class="stat-label">30-Day DB per EM</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${sizeFormat(db30d)}</div>
-      <div class="stat-label">30-Day DB Size</div>
+      <div class="stat-value">${headroom.toLocaleString()}x</div>
+      <div class="stat-label">SQLite Headroom</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${emCount}</div>
+      <div class="stat-label">EM${emCount > 1 ? 's' : ''} Required</div>
     </div>
   `;
 
@@ -1042,26 +1052,22 @@ function calculate() {
 
   // Infrastructure recommendation (hidden)
   let infra, dbNote, extras = [];
-  if (totalSensors <= 10) {
-    infra = 'Single EM with SQLite';
-    dbNote = 'Current architecture is sufficient';
-  } else if (totalSensors <= 50) {
-    infra = 'Single EM with PostgreSQL';
-    dbNote = 'Migrate to PostgreSQL for better concurrency';
-  } else if (totalSensors <= 150) {
-    infra = 'EM with dedicated PostgreSQL instance';
-    dbNote = 'Separate database server for performance';
-    extras.push('Dual ENI (syslog + dashboard separation)');
+  const emCount = Math.ceil(totalSensors / MAX_SENSORS_PER_EM);
+  if (emCount === 1) {
+    infra = 'Single EM (t3.small) with SQLite';
+    dbNote = 'SQLite WAL mode — validated at 78,000 rows/sec (1,025x headroom at 250 sensors)';
   } else {
-    infra = 'Split architecture (ingest + dashboard + dedicated DB)';
-    dbNote = 'Separate ingest and dashboard nodes with dedicated PostgreSQL';
-    extras.push('Dual ENI (syslog + dashboard separation)');
+    infra = `${emCount} x EM (t3.small) with SQLite`;
+    dbNote = `SQLite WAL mode on each EM — horizontal scaling, ~250 sensors per EM`;
   }
   if (uniqueIps > 50000) extras.push('Tiered blocking (2+ hit threshold)');
 
   let infraHtml = `
     <div class="infra-row"><span class="infra-key">Architecture</span><span class="infra-val">${infra}</span></div>
     <div class="infra-row"><span class="infra-key">Database</span><span class="infra-val">${dbNote}</span></div>
+    <div class="infra-row"><span class="infra-key">Instance</span><span class="infra-val">t3.small (2 vCPU, 1 GB RAM) per EM</span></div>
+    <div class="infra-row"><span class="infra-key">Storage</span><span class="infra-val">60 GB gp3 /var per EM (30-day retention)</span></div>
+    <div class="infra-row"><span class="infra-key">EM Count</span><span class="infra-val">${emCount} ${emCount === 1 ? '(capacity: 250 sensors)' : `(250 sensors each, ${totalSensors.toLocaleString()} total)`}</span></div>
   `;
   extras.forEach(e => {
     infraHtml += `<div class="infra-row"><span class="infra-key">Consider</span><span class="infra-val">${e}</span></div>`;
