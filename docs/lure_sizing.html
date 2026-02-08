@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LURE - Deployment Sizing Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0e14;
+  --bg-secondary: #111820;
+  --bg-card: #161d27;
+  --bg-input: #0d1219;
+  --border: #1e2a3a;
+  --border-focus: #2d7ff9;
+  --accent: #2d7ff9;
+  --accent-dim: rgba(45, 127, 249, 0.15);
+  --accent-glow: rgba(45, 127, 249, 0.3);
+  --text-primary: #e4e8ee;
+  --text-secondary: #8899aa;
+  --text-dim: #556677;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --green-dim: rgba(34, 197, 94, 0.12);
+  --red-dim: rgba(239, 68, 68, 0.12);
+  --yellow-dim: rgba(245, 158, 11, 0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.scanner-line {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  z-index: 100;
+  pointer-events: none;
+  animation: scan 3s ease-in-out;
+}
+
+@keyframes scan {
+  0% { top: 0; opacity: 0.6; }
+  100% { top: 100vh; opacity: 0; }
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+header {
+  margin-bottom: 48px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+h1 {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+h1 span {
+  font-weight: 600;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+/* Input Section */
+.input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 640px) {
+  .input-grid { grid-template-columns: 1fr; }
+}
+
+.input-group {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+
+.input-group:focus-within {
+  border-color: var(--border-focus);
+}
+
+.input-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.input-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.input-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.input-desc strong {
+  color: var(--text-secondary);
+}
+
+input[type="number"], input[type="text"] {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+input::placeholder {
+  color: var(--text-dim);
+}
+
+/* CIDR input area */
+.cidr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cidr-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cidr-row input {
+  flex: 1;
+}
+
+.cidr-row .ip-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 80px;
+  text-align: right;
+}
+
+.cidr-row .remove-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cidr-row .remove-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--red-dim);
+}
+
+.add-cidr-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.add-cidr-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* Range input styling */
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range-row input[type="number"] {
+  width: 80px;
+  text-align: center;
+}
+
+.range-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 50px;
+  text-align: center;
+}
+
+/* Calculate button */
+.calc-btn {
+  width: 100%;
+  padding: 14px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 48px;
+}
+
+.calc-btn:hover {
+  background: #1a6ef0;
+  box-shadow: 0 4px 24px var(--accent-glow);
+}
+
+.calc-btn:active {
+  transform: scale(0.98);
+}
+
+/* Results */
+.results {
+  display: none;
+}
+
+.results.visible {
+  display: block;
+  animation: resultsIn 0.4s ease;
+}
+
+@keyframes resultsIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result-section {
+  margin-bottom: 32px;
+}
+
+.section-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+/* Sensor count hero */
+.sensor-hero {
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  margin-bottom: 32px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sensor-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.sensor-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 64px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.sensor-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+
+.sensor-breakdown {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.breakdown-item {
+  text-align: center;
+}
+
+.breakdown-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.breakdown-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Detection probability table */
+.prob-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+
+.prob-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.prob-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.prob-table tr:last-child td {
+  border-bottom: none;
+}
+
+.prob-bar-cell {
+  width: 40%;
+}
+
+.prob-bar-bg {
+  background: var(--bg-input);
+  border-radius: 3px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.prob-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.prob-value {
+  text-align: right;
+  font-weight: 600;
+}
+
+/* Firewall compat */
+.fw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fw-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.fw-name {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.fw-limit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.fw-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.fw-status.ok {
+  color: var(--success);
+  background: var(--green-dim);
+}
+
+.fw-status.exceeds {
+  color: var(--danger);
+  background: var(--red-dim);
+}
+
+.fw-status.warn {
+  color: var(--warning);
+  background: var(--yellow-dim);
+}
+
+/* Tip box */
+.tip-box {
+  background: var(--yellow-dim);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--warning);
+  display: none;
+}
+
+.tip-box.visible {
+  display: block;
+}
+
+/* Note */
+.note {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 12px;
+  font-style: italic;
+}
+
+/* Infrastructure (hidden by default) */
+.infra-section {
+  display: none;
+}
+
+.infra-section.visible {
+  display: block;
+}
+
+.infra-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+  margin-top: 16px;
+}
+
+.infra-toggle:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+}
+
+.infra-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.infra-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.infra-row:last-child {
+  border-bottom: none;
+}
+
+.infra-key {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.infra-val {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* Customer infrastructure summary */
+.infra-summary {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.infra-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.infra-summary-row .key {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.infra-summary-row .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.cidr-summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0 3px 16px;
+}
+
+.cidr-summary-item .key {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.cidr-summary-item .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+</style>
+</head>
+<body>
+
+<div class="scanner-line" id="scanLine"></div>
+
+<div class="container">
+  <header>
+    <div class="logo">LURE</div>
+    <h1>Deployment <span>Sizing Calculator</span></h1>
+    <p class="subtitle">Calculate the recommended number of sensors based on your infrastructure</p>
+  </header>
+
+  <!-- INPUTS -->
+  <div class="input-grid">
+    <div class="input-group">
+      <div class="input-label">DNS Records</div>
+      <div class="input-desc">Total number of public-facing DNS A/AAAA records (web servers, mail servers, VPNs, etc.)</div>
+      <input type="number" id="dnsRecords" placeholder="e.g. 25" min="0" value="">
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">DNS Sensor Ratio</div>
+      <div class="input-desc">Deploy <strong>1 sensor per N DNS records</strong>. Sensors sit alongside your real servers so attackers enumerating your DNS entries trip a sensor. <strong>Lower = more sensors = better detection.</strong> Recommended: 5</div>
+      <div class="range-row">
+        <input type="number" id="dnsRatio" value="5" min="1" max="20">
+        <span style="color: var(--text-dim); font-size: 12px;">1 sensor per N records</span>
+      </div>
+    </div>
+
+    <div class="input-group full-width">
+      <div class="input-label">ASN / IP Allocations</div>
+      <div class="input-desc">Enter your public CIDR blocks. Sensors are scattered across your IP ranges to detect attackers sweeping your network blocks for vulnerable hosts.</div>
+      <div class="cidr-list" id="cidrList">
+        <div class="cidr-row">
+          <input type="text" placeholder="e.g. 192.0.2.0/24" class="cidr-input" oninput="updateCidrCount(this)">
+          <span class="ip-count"></span>
+          <button class="remove-btn" onclick="removeCidr(this)" title="Remove">&times;</button>
+        </div>
+      </div>
+      <button class="add-cidr-btn" onclick="addCidr()">+ Add CIDR Block</button>
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">ASN Sensor Density</div>
+      <div class="input-desc">What <strong>percentage of your IP space</strong> should be covered by sensors. Higher density means attackers scanning your network are detected faster. <strong>Recommended: 10% &bull; Minimum: 5%</strong></div>
+      <div class="range-row">
+        <input type="number" id="asnDensity" value="10" min="1" max="100">
+        <span style="color: var(--text-dim); font-size: 12px;">% of IP space</span>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">Density Example</div>
+      <div class="input-desc" id="densityExample" style="margin-bottom:0">
+        At <strong>10%</strong> density in a /24 (254 IPs), LURE deploys <strong>26 sensors</strong>. An attacker probing random IPs has a 10% chance of hitting a sensor on each attempt &mdash; and near-100% detection if they sweep the full block.
+      </div>
+    </div>
+  </div>
+
+  <button class="calc-btn" onclick="calculate()">Calculate Deployment Size</button>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+
+    <div class="result-section">
+      <div class="section-header">Customer Infrastructure</div>
+      <div class="infra-summary" id="infraSummary"></div>
+    </div>
+
+    <div class="sensor-hero">
+      <div class="sensor-count" id="totalSensors">0</div>
+      <div class="sensor-label">Total Sensors</div>
+      <div class="sensor-breakdown">
+        <div class="breakdown-item">
+          <div class="breakdown-value" id="dnsSensors">0</div>
+          <div class="breakdown-label">DNS Protection</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="breakdown-value" id="asnSensors">0</div>
+          <div class="breakdown-label">ASN Coverage</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-section" id="detectionSection">
+      <div class="section-header">Detection Probability — ASN Sweep</div>
+      <p class="input-desc" id="detectionDesc" style="margin-bottom: 16px;"></p>
+      <table class="prob-table">
+        <thead>
+          <tr>
+            <th>Probes</th>
+            <th>Detection</th>
+            <th class="prob-bar-cell">Probability</th>
+          </tr>
+        </thead>
+        <tbody id="probBody"></tbody>
+      </table>
+      <p class="note">Most automated scanners sweep entire /24 blocks (254 probes), giving near-100% detection at most sensor densities.</p>
+    </div>
+
+    <div class="result-section">
+      <div class="section-header">Estimated Database Growth — 30-Day Retention</div>
+      <div class="stats-grid" id="dbStats"></div>
+    </div>
+
+    <div class="result-section">
+      <div class="section-header">Estimated Blocklist Size — 30 Days</div>
+      <div class="stats-grid" id="blStats"></div>
+      <div class="fw-list" id="fwList" style="margin-top: 16px;"></div>
+      <div class="tip-box" id="tipBox">Apply a minimum hit threshold (e.g. 2+ hits) to reduce the blocklist by ~45% while keeping high-confidence entries.</div>
+    </div>
+
+    <div class="result-section">
+      <button class="infra-toggle" onclick="toggleInfra()">▸ Show Internal Infrastructure Recommendations</button>
+      <div class="infra-section" id="infraSection">
+        <div class="infra-card" id="infraCard"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const AVG_ROWS_PER_SENSOR_PER_DAY = 18252;
+const BYTES_PER_ROW = 314;
+const RETENTION_DAYS = 30;
+const NEW_IPS_PER_SENSOR_PER_DAY = 130;
+const DB_OVERHEAD = 1.15;
+const BLOCKLIST_BYTES_PER_IP = 16;
+
+const FIREWALLS = [
+  { name: 'nftables sets', limit: 100000 },
+  { name: 'Cisco ACL', limit: 50000 },
+  { name: 'Palo Alto EDL', limit: 150000 }
+];
+
+function sizeFormat(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (Math.abs(bytes) >= 1024 && i < units.length - 1) {
+    bytes /= 1024;
+    i++;
+  }
+  return bytes.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' ' + units[i];
+}
+
+function cidrToHosts(cidr) {
+  const parts = cidr.trim().split('/');
+  if (parts.length !== 2) return 0;
+  const prefix = parseInt(parts[1]);
+  if (isNaN(prefix) || prefix < 0 || prefix > 32) return 0;
+  const total = Math.pow(2, 32 - prefix);
+  return Math.max(total - 2, 1);
+}
+
+function addCidr() {
+  const list = document.getElementById('cidrList');
+  const row = document.createElement('div');
+  row.className = 'cidr-row';
+  row.innerHTML = `
+    <input type="text" placeholder="e.g. 198.51.100.0/24" class="cidr-input" oninput="updateCidrCount(this)">
+    <span class="ip-count"></span>
+    <button class="remove-btn" onclick="removeCidr(this)" title="Remove">&times;</button>
+  `;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function removeCidr(btn) {
+  const list = document.getElementById('cidrList');
+  if (list.children.length > 1) {
+    btn.closest('.cidr-row').remove();
+  }
+}
+
+function updateCidrCount(input) {
+  const span = input.nextElementSibling;
+  const val = input.value.trim();
+  if (val && val.includes('/')) {
+    const hosts = cidrToHosts(val);
+    span.textContent = hosts > 0 ? hosts.toLocaleString() + ' IPs' : 'invalid';
+    span.style.color = hosts > 0 ? 'var(--text-dim)' : 'var(--danger)';
+  } else {
+    span.textContent = '';
+  }
+}
+
+// Update density example text dynamically
+document.getElementById('asnDensity').addEventListener('input', function() {
+  const d = parseInt(this.value) || 10;
+  const sensors = Math.max(1, Math.ceil(254 * d / 100));
+  document.getElementById('densityExample').innerHTML =
+    `At <strong>${d}%</strong> density in a /24 (254 IPs), LURE deploys <strong>${sensors} sensors</strong>. An attacker probing random IPs has a ${d}% chance of hitting a sensor on each attempt &mdash; and near-100% detection if they sweep the full block.`;
+});
+
+function detectionProb(density, probes) {
+  return 1 - Math.pow(1 - density, probes);
+}
+
+function probColor(p) {
+  if (p >= 0.9) return 'var(--success)';
+  if (p >= 0.5) return 'var(--accent)';
+  if (p >= 0.2) return 'var(--warning)';
+  return 'var(--danger)';
+}
+
+function calculate() {
+  const dnsRecords = parseInt(document.getElementById('dnsRecords').value) || 0;
+  const dnsRatio = Math.max(1, parseInt(document.getElementById('dnsRatio').value) || 5);
+  const asnDensity = Math.max(1, Math.min(100, parseInt(document.getElementById('asnDensity').value) || 10));
+  const asnPct = asnDensity / 100;
+
+  // Gather CIDRs
+  const cidrInputs = document.querySelectorAll('.cidr-input');
+  let totalIps = 0;
+  const cidrs = [];
+  cidrInputs.forEach(input => {
+    const val = input.value.trim();
+    if (val) {
+      const hosts = cidrToHosts(val);
+      if (hosts > 0) {
+        cidrs.push({ cidr: val, hosts });
+        totalIps += hosts;
+      }
+    }
+  });
+
+  // Calculate sensors
+  const dnsSensors = dnsRecords > 0 ? Math.max(1, Math.ceil(dnsRecords / dnsRatio)) : 0;
+  const asnSensors = totalIps > 0 ? Math.max(1, Math.ceil(totalIps * asnPct)) : 0;
+  const totalSensors = dnsSensors + asnSensors;
+
+  if (totalSensors === 0) {
+    alert('Please enter DNS records and/or CIDR blocks to calculate.');
+    return;
+  }
+
+  const density = totalIps > 0 ? asnSensors / totalIps : 0;
+
+  // DB growth
+  const dailyRows = totalSensors * AVG_ROWS_PER_SENSOR_PER_DAY;
+  const db30d = dailyRows * RETENTION_DAYS * BYTES_PER_ROW * DB_OVERHEAD;
+
+  // Blocklist
+  const overlapFactor = Math.sqrt(totalSensors / 3);
+  const baselineIps = NEW_IPS_PER_SENSOR_PER_DAY * 3 * 30;
+  const uniqueIps = Math.floor(baselineIps * overlapFactor);
+  const blSize = uniqueIps * BLOCKLIST_BYTES_PER_IP;
+
+  // Trigger scan animation
+  const scanLine = document.getElementById('scanLine');
+  scanLine.style.animation = 'none';
+  scanLine.offsetHeight;
+  scanLine.style.animation = 'scan 3s ease-in-out';
+
+  // Show results
+  const results = document.getElementById('results');
+  results.classList.add('visible');
+
+  // Infrastructure summary
+  let summaryHtml = `
+    <div class="infra-summary-row"><span class="key">DNS Records</span><span class="val">${dnsRecords.toLocaleString()}</span></div>
+    <div class="infra-summary-row"><span class="key">DNS Sensor Ratio</span><span class="val">1 : ${dnsRatio}</span></div>
+    <div class="infra-summary-row"><span class="key">ASN Sensor Density</span><span class="val">${asnDensity}%</span></div>
+    <div class="infra-summary-row"><span class="key">Total Usable IPs</span><span class="val">${totalIps.toLocaleString()}</span></div>
+  `;
+  cidrs.forEach(c => {
+    summaryHtml += `<div class="cidr-summary-item"><span class="key">${c.cidr}</span><span class="val">${c.hosts.toLocaleString()} IPs</span></div>`;
+  });
+  document.getElementById('infraSummary').innerHTML = summaryHtml;
+
+  // Sensor hero
+  document.getElementById('totalSensors').textContent = totalSensors.toLocaleString();
+  document.getElementById('dnsSensors').textContent = dnsSensors.toLocaleString();
+  document.getElementById('asnSensors').textContent = asnSensors.toLocaleString();
+
+  // Detection probability
+  const detSection = document.getElementById('detectionSection');
+  if (totalIps > 0 && density > 0) {
+    detSection.style.display = 'block';
+    document.getElementById('detectionDesc').textContent =
+      `With ${asnSensors.toLocaleString()} sensors across ${totalIps.toLocaleString()} IPs (${asnDensity}% density), the chance of detecting an attacker probing your IP space:`;
+
+    const probes = [1, 3, 5, 10, 20, 50, 100, 254];
+    let probHtml = '';
+    probes.forEach(n => {
+      const p = detectionProb(density, n);
+      const pct = (p * 100).toFixed(1);
+      const color = probColor(p);
+      probHtml += `
+        <tr>
+          <td>${n}</td>
+          <td class="prob-value" style="color: ${color}">${pct}%</td>
+          <td class="prob-bar-cell">
+            <div class="prob-bar-bg">
+              <div class="prob-bar-fill" style="width: ${pct}%; background: ${color};"></div>
+            </div>
+          </td>
+        </tr>`;
+    });
+    document.getElementById('probBody').innerHTML = probHtml;
+  } else {
+    detSection.style.display = 'none';
+  }
+
+  // DB stats
+  document.getElementById('dbStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value">${dailyRows.toLocaleString()}</div>
+      <div class="stat-label">Daily Rows</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${(dailyRows / 86400).toFixed(1)}</div>
+      <div class="stat-label">Rows/sec (avg)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${(dailyRows * 30).toLocaleString()}</div>
+      <div class="stat-label">30-Day Total Rows</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${sizeFormat(db30d)}</div>
+      <div class="stat-label">30-Day DB Size</div>
+    </div>
+  `;
+
+  // Blocklist stats
+  document.getElementById('blStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value">${uniqueIps.toLocaleString()}</div>
+      <div class="stat-label">Unique Blocked IPs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${sizeFormat(blSize)}</div>
+      <div class="stat-label">Blocklist JSON Size</div>
+    </div>
+  `;
+
+  // Firewall compat
+  let fwHtml = '';
+  FIREWALLS.forEach(fw => {
+    let statusClass, statusText;
+    if (uniqueIps <= fw.limit * 0.7) {
+      statusClass = 'ok'; statusText = '✓ OK';
+    } else if (uniqueIps <= fw.limit) {
+      statusClass = 'warn'; statusText = '⚠ NEAR LIMIT';
+    } else {
+      statusClass = 'exceeds'; statusText = '✗ EXCEEDS';
+    }
+    fwHtml += `
+      <div class="fw-item">
+        <div>
+          <div class="fw-name">${fw.name}</div>
+          <div class="fw-limit">max ${fw.limit.toLocaleString()} entries</div>
+        </div>
+        <span class="fw-status ${statusClass}">${statusText}</span>
+      </div>`;
+  });
+  document.getElementById('fwList').innerHTML = fwHtml;
+
+  const tipBox = document.getElementById('tipBox');
+  tipBox.classList.toggle('visible', uniqueIps > 50000);
+
+  // Infrastructure recommendation (hidden)
+  let infra, dbNote, extras = [];
+  if (totalSensors <= 10) {
+    infra = 'Single EM with SQLite';
+    dbNote = 'Current architecture is sufficient';
+  } else if (totalSensors <= 50) {
+    infra = 'Single EM with PostgreSQL';
+    dbNote = 'Migrate to PostgreSQL for better concurrency';
+  } else if (totalSensors <= 150) {
+    infra = 'EM with dedicated PostgreSQL instance';
+    dbNote = 'Separate database server for performance';
+    extras.push('Dual ENI (syslog + dashboard separation)');
+  } else {
+    infra = 'Split architecture (ingest + dashboard + dedicated DB)';
+    dbNote = 'Separate ingest and dashboard nodes with dedicated PostgreSQL';
+    extras.push('Dual ENI (syslog + dashboard separation)');
+  }
+  if (uniqueIps > 50000) extras.push('Tiered blocking (2+ hit threshold)');
+
+  let infraHtml = `
+    <div class="infra-row"><span class="infra-key">Architecture</span><span class="infra-val">${infra}</span></div>
+    <div class="infra-row"><span class="infra-key">Database</span><span class="infra-val">${dbNote}</span></div>
+  `;
+  extras.forEach(e => {
+    infraHtml += `<div class="infra-row"><span class="infra-key">Consider</span><span class="infra-val">${e}</span></div>`;
+  });
+  document.getElementById('infraCard').innerHTML = infraHtml;
+
+  // Scroll to results
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleInfra() {
+  const section = document.getElementById('infraSection');
+  const btn = section.previousElementSibling;
+  const visible = section.classList.toggle('visible');
+  btn.textContent = visible ? '▾ Hide Internal Infrastructure Recommendations' : '▸ Show Internal Infrastructure Recommendations';
+}
+</script>
+
+</body>
+</html>
