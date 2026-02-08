@@ -730,6 +730,8 @@ input::placeholder {
       </div>
     </div>
 
+    <div id="deploymentAlert" style="display:none; margin: 0 auto 24px; max-width: 640px; padding: 16px 20px; border-radius: 8px; font-size: 14px; line-height: 1.6;"></div>
+
     <div class="result-section" id="detectionSection">
       <div class="section-header">Detection Probability — ASN Sweep</div>
       <p class="input-desc" id="detectionDesc" style="margin-bottom: 16px;"></p>
@@ -894,6 +896,7 @@ function calculate() {
   // DB growth
   const dailyRows = totalSensors * AVG_ROWS_PER_SENSOR_PER_DAY;
   const db30d = dailyRows * RETENTION_DAYS * BYTES_PER_ROW * DB_OVERHEAD;
+  const emCount = Math.ceil(totalSensors / MAX_SENSORS_PER_EM);
 
   // Blocklist
   const overlapFactor = Math.sqrt(totalSensors / 3);
@@ -927,6 +930,36 @@ function calculate() {
   document.getElementById('totalSensors').textContent = totalSensors.toLocaleString();
   document.getElementById('dnsSensors').textContent = dnsSensors.toLocaleString();
   document.getElementById('asnSensors').textContent = asnSensors.toLocaleString();
+
+  // Deployment alert
+  const alertEl = document.getElementById('deploymentAlert');
+  if (emCount > 1) {
+    const sensorsLast = totalSensors - (emCount - 1) * MAX_SENSORS_PER_EM;
+    alertEl.style.display = 'block';
+    alertEl.style.background = 'rgba(245, 158, 11, 0.1)';
+    alertEl.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+    alertEl.style.color = '#f59e0b';
+    alertEl.innerHTML = `<strong>⚠ Multiple LURE Deployments Required</strong><br>
+      Each LURE deployment supports up to 250 sensors. This sizing requires
+      <strong>${emCount} separate deployments</strong>, each with its own Enterprise Manager,
+      sensor fleet, database, and dashboard.<br>
+      <span style="color: var(--text-secondary); margin-top: 8px; display: inline-block;">
+        Deployment plan: ${emCount - 1} × 250 sensors + 1 × ${sensorsLast} sensors = ${totalSensors.toLocaleString()} total
+      </span>`;
+  } else if (totalSensors > 200) {
+    alertEl.style.display = 'block';
+    alertEl.style.background = 'rgba(245, 158, 11, 0.06)';
+    alertEl.style.border = '1px solid rgba(245, 158, 11, 0.2)';
+    alertEl.style.color = '#f59e0b';
+    alertEl.innerHTML = `<strong>⚠ Approaching Single-Deployment Limit</strong><br>
+      <span style="color: var(--text-secondary);">
+        You are at ${totalSensors}/250 sensors per deployment. If sensor count grows,
+        a second LURE deployment will be needed. Each deployment is an independent
+        Enterprise Manager with its own sensors, database, and dashboard.
+      </span>`;
+  } else {
+    alertEl.style.display = 'none';
+  }
 
   // Detection probability
   const detSection = document.getElementById('detectionSection');
@@ -1052,7 +1085,6 @@ function calculate() {
 
   // Infrastructure recommendation (hidden)
   let infra, dbNote, extras = [];
-  const emCount = Math.ceil(totalSensors / MAX_SENSORS_PER_EM);
   if (emCount === 1) {
     infra = 'Single EM (t3.small) with SQLite';
     dbNote = 'SQLite WAL mode — validated at 78,000 rows/sec (1,025x headroom at 250 sensors)';
