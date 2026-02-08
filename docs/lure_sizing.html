@@ -695,6 +695,14 @@ input::placeholder {
         At <strong>10%</strong> density in a /24 (254 IPs), LURE deploys <strong>26 sensors</strong>. An attacker probing random IPs has a 10% chance of hitting a sensor on each attempt &mdash; and near-100% detection if they sweep the full block.
       </div>
     </div>
+    <div class="input-group full-width">
+      <div class="input-label">Custom Firewall / IPS Limit (Optional)</div>
+      <div class="input-desc">If your firewall or IPS/IDS platform isn't listed above, enter its name and maximum blocklist entry limit. This will be checked against the projected blocklist size in the results.</div>
+      <div style="display: flex; gap: 12px;">
+        <input type="text" id="customFwName" placeholder="e.g. Snort, Suricata, Check Point" style="flex: 2;">
+        <input type="number" id="customFwLimit" placeholder="Max entries" min="0" style="flex: 1;">
+      </div>
+    </div>
   </div>
 
   <button class="calc-btn" onclick="calculate()">Calculate Deployment Size</button>
@@ -746,6 +754,8 @@ input::placeholder {
     <div class="result-section">
       <div class="section-header">Estimated Blocklist Size — 30 Days</div>
       <div class="stats-grid" id="blStats"></div>
+      <div class="section-header" style="margin-top: 24px;">Firewall &amp; IPS/IDS Compatibility</div>
+      <p class="input-desc" style="margin-bottom: 12px;">Estimated blocklist size checked against documented platform limits. Cisco Firepower limits are memory-based and vary by model — check your specific hardware.</p>
       <div class="fw-list" id="fwList" style="margin-top: 16px;"></div>
       <div class="tip-box" id="tipBox">Apply a minimum hit threshold (e.g. 2+ hits) to reduce the blocklist by ~45% while keeping high-confidence entries.</div>
     </div>
@@ -769,9 +779,11 @@ const DB_OVERHEAD = 1.15;
 const BLOCKLIST_BYTES_PER_IP = 16;
 
 const FIREWALLS = [
-  { name: 'nftables sets', limit: 100000 },
-  { name: 'Cisco ACL', limit: 50000 },
-  { name: 'Palo Alto EDL', limit: 150000 }
+  { name: 'Palo Alto EDL (PA-3200/5200/7000)', limit: 150000, source: 'Palo Alto Docs' },
+  { name: 'Palo Alto EDL (all other models)', limit: 50000, source: 'Palo Alto Docs' },
+  { name: 'Fortinet FortiGate (per feed)', limit: 131072, source: 'FortiOS Docs' },
+  { name: 'Cisco Firepower (Security Intelligence)', limit: 0, source: 'Memory-based, varies by model' },
+  { name: 'Linux nftables sets', limit: 500000, source: 'Kernel memory-based, 500K+ tested' }
 ];
 
 function sizeFormat(bytes) {
@@ -979,9 +991,36 @@ function calculate() {
   let fwHtml = '';
   FIREWALLS.forEach(fw => {
     let statusClass, statusText;
-    if (uniqueIps <= fw.limit * 0.7) {
+    if (fw.limit === 0) {
+      // Memory-based, no fixed limit
+      statusClass = 'warn';
+      statusText = '⚠ VARIES';
+    } else if (uniqueIps <= fw.limit * 0.7) {
       statusClass = 'ok'; statusText = '✓ OK';
     } else if (uniqueIps <= fw.limit) {
+      statusClass = 'warn'; statusText = '⚠ NEAR LIMIT';
+    } else {
+      statusClass = 'exceeds'; statusText = '✗ EXCEEDS';
+    }
+    const limitText = fw.limit > 0 ? `max ${fw.limit.toLocaleString()} entries` : fw.source;
+    fwHtml += `
+      <div class="fw-item">
+        <div>
+          <div class="fw-name">${fw.name}</div>
+          <div class="fw-limit">${limitText}</div>
+        </div>
+        <span class="fw-status ${statusClass}">${statusText}</span>
+      </div>`;
+  });
+
+  // Custom firewall limit
+  const customLimit = parseInt(document.getElementById('customFwLimit').value) || 0;
+  const customName = document.getElementById('customFwName').value.trim() || 'Custom Platform';
+  if (customLimit > 0) {
+    let statusClass, statusText;
+    if (uniqueIps <= customLimit * 0.7) {
+      statusClass = 'ok'; statusText = '✓ OK';
+    } else if (uniqueIps <= customLimit) {
       statusClass = 'warn'; statusText = '⚠ NEAR LIMIT';
     } else {
       statusClass = 'exceeds'; statusText = '✗ EXCEEDS';
@@ -989,12 +1028,13 @@ function calculate() {
     fwHtml += `
       <div class="fw-item">
         <div>
-          <div class="fw-name">${fw.name}</div>
-          <div class="fw-limit">max ${fw.limit.toLocaleString()} entries</div>
+          <div class="fw-name">${customName}</div>
+          <div class="fw-limit">max ${customLimit.toLocaleString()} entries (custom)</div>
         </div>
         <span class="fw-status ${statusClass}">${statusText}</span>
       </div>`;
-  });
+  }
+
   document.getElementById('fwList').innerHTML = fwHtml;
 
   const tipBox = document.getElementById('tipBox');
